@@ -37,4 +37,38 @@ public final class NotificationSettings {
                 .putString("message_mode", mode == null ? "all" : mode)
                 .apply();
     }
+
+    // Individual setters used by the JS notification-settings bridge.
+    public static void setAppEnabled(Context c, boolean value) {
+        prefs(c).edit().putBoolean("app_enabled", value).apply();
+    }
+
+    public static void setGlobalEnabled(Context c, boolean value) {
+        prefs(c).edit().putBoolean("global", value).apply();
+    }
+
+    public static void setAnnouncementEnabled(Context c, boolean value) {
+        prefs(c).edit().putBoolean("announcements", value).apply();
+    }
+
+    public static void setWebAppEnabled(Context c, boolean value) {
+        prefs(c).edit().putBoolean("web_app", value).apply();
+    }
+
+    public static void setMessageMode(Context c, String mode) {
+        prefs(c).edit().putString("message_mode", mode == null ? "all" : mode).apply();
+    }
+
+    public static void setClassEnabled(Context c, String classId, boolean value) {
+        if (classId == null || classId.isEmpty()) return;
+        prefs(c).edit().putBoolean("class_" + classId, value).apply();
+    }
+
+    // is/get-prefixed aliases used by the JS notification-settings bridge.
+    public static boolean isAppEnabled(Context c) { return appEnabled(c); }
+    public static boolean isGlobalEnabled(Context c) { return global(c); }
+    public static boolean isAnnouncementEnabled(Context c) { return announcements(c); }
+    public static boolean isWebAppEnabled(Context c) { return webAppEnabled(c); }
+    public static String getMessageMode(Context c) { return messageMode(c); }
+    public static boolean isClassEnabled(Context c, String classId) { return classEnabled(c, classId); }
 }
