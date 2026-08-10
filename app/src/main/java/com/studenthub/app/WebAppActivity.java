@@ -2,9 +2,6 @@ package com.studenthub.app;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -13,131 +10,338 @@ import android.os.Bundle;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
+import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
-import android.webkit.WebResourceRequest;
-import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
-import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
-import androidx.core.app.NotificationCompat;
-import androidx.webkit.WebViewAssetLoader;
-import androidx.webkit.WebViewClientCompat;
+
+import com.google.firebase.messaging.FirebaseMessaging;
 
 public class WebAppActivity extends Activity {
 
-    private WebView w;
-    private ValueCallback<Uri[]> cb;
+    private WebView webView;
 
-    private static final int FILE_PICKER = 42;
-    private static final int NOTIFICATION_PERMISSION = 1001;
-    private static final String CHANNEL_ID = "student_hub_app";
+    private ValueCallback<Uri[]> fileCallback;
+
+    private static final int FILE_PICKER =
+            5001;
+
+    private static final int
+            NOTIFICATION_PERMISSION =
+            5002;
+
+    private static final String WEBSITE_URL =
+            "https://student-hub-five-ashy.vercel.app";
 
     @Override
-    protected void onCreate(Bundle b) {
-        super.onCreate(b);
+    protected void onCreate(
+            Bundle savedInstanceState
+    ) {
 
-        w = new WebView(this);
-        setContentView(w);
+        super.onCreate(savedInstanceState);
+
+        webView = new WebView(this);
+
+        setContentView(webView);
+
+        configureWebView();
 
         hideNavigationBar();
 
-        WebSettings s = w.getSettings();
-
-        s.setJavaScriptEnabled(true);
-        s.setDomStorageEnabled(true);
-        s.setDatabaseEnabled(true);
-
-        s.setAllowFileAccess(false);
-        s.setAllowContentAccess(true);
-
-        s.setMediaPlaybackRequiresUserGesture(false);
-
-        WebViewAssetLoader loader =
-                new WebViewAssetLoader.Builder()
-                        .addPathHandler(
-                                "/assets/",
-                                new WebViewAssetLoader.AssetsPathHandler(this)
-                        )
-                        .build();
-
-        w.setWebViewClient(new WebViewClientCompat() {
-
-            @Override
-            public WebResourceResponse shouldInterceptRequest(
-                    WebView view,
-                    WebResourceRequest request
-            ) {
-                return loader.shouldInterceptRequest(
-                        request.getUrl()
-                );
-            }
-        });
-
-        w.setWebChromeClient(new WebChromeClient() {
-
-            @Override
-            public boolean onShowFileChooser(
-                    WebView view,
-                    ValueCallback<Uri[]> callback,
-                    FileChooserParams params
-            ) {
-
-                cb = callback;
-
-                try {
-
-                    Intent intent = params.createIntent();
-
-                    intent.putExtra(
-                            Intent.EXTRA_ALLOW_MULTIPLE,
-                            true
-                    );
-
-                    startActivityForResult(
-                            intent,
-                            FILE_PICKER
-                    );
-
-                    return true;
-
-                } catch (Exception e) {
-
-                    cb = null;
-                    return false;
-                }
-            }
-        });
-
-        String page =
-                getIntent().getStringExtra("page");
-
-        if (page == null || page.trim().isEmpty()) {
-
-            page =
-                    "https://student-hub-five-ashy.vercel.app";
-        }
-
-        w.loadUrl(page);
-
         requestNotificationPermission();
 
-        createNotificationChannel();
+        getFCMToken();
+
+        webView.loadUrl(
+                WEBSITE_URL
+        );
+    }
+
+    private void configureWebView() {
+
+        WebSettings settings =
+                webView.getSettings();
+
+        settings.setJavaScriptEnabled(true);
+
+        settings.setDomStorageEnabled(true);
+
+        settings.setDatabaseEnabled(true);
+
+        settings.setAllowContentAccess(true);
+
+        settings.setAllowFileAccess(false);
+
+        settings.setMediaPlaybackRequiresUserGesture(
+                false
+        );
+
+        settings.setBuiltInZoomControls(false);
+
+        settings.setDisplayZoomControls(false);
+
+        /*
+         * Website → Android bridge
+         */
+        webView.addJavascriptInterface(
+                new AndroidNotificationBridge(),
+                "StudentHubAndroid"
+        );
+
+        webView.setWebViewClient(
+                new WebViewClient()
+        );
+
+        webView.setWebChromeClient(
+                new WebChromeClient() {
+
+                    @Override
+                    public boolean
+                    onShowFileChooser(
+                            WebView webView,
+                            ValueCallback<Uri[]> callback,
+                            FileChooserParams params
+                    ) {
+
+                        fileCallback =
+                                callback;
+
+                        try {
+
+                            Intent intent =
+                                    params.createIntent();
+
+                            intent.putExtra(
+                                    Intent.EXTRA_ALLOW_MULTIPLE,
+                                    true
+                            );
+
+                            startActivityForResult(
+                                    intent,
+                                    FILE_PICKER
+                            );
+
+                            return true;
+
+                        } catch (Exception e) {
+
+                            fileCallback = null;
+
+                            return false;
+                        }
+                    }
+                }
+        );
+    }
+
+    /*
+     * Website se Android notification
+     * settings control karne ke liye bridge.
+     */
+    public class AndroidNotificationBridge {
+
+        @JavascriptInterface
+        public void setAppEnabled(
+                boolean value
+        ) {
+
+            NotificationSettings
+                    .setAppEnabled(
+                            WebAppActivity.this,
+                            value
+                    );
+        }
+
+        @JavascriptInterface
+        public void setGlobalEnabled(
+                boolean value
+        ) {
+
+            NotificationSettings
+                    .setGlobalEnabled(
+                            WebAppActivity.this,
+                            value
+                    );
+        }
+
+        @JavascriptInterface
+        public void setAnnouncementEnabled(
+                boolean value
+        ) {
+
+            NotificationSettings
+                    .setAnnouncementEnabled(
+                            WebAppActivity.this,
+                            value
+                    );
+        }
+
+        @JavascriptInterface
+        public void setWebAppEnabled(
+                boolean value
+        ) {
+
+            NotificationSettings
+                    .setWebAppEnabled(
+                            WebAppActivity.this,
+                            value
+                    );
+        }
+
+        @JavascriptInterface
+        public void setMessageMode(
+                String mode
+        ) {
+
+            if (!"all".equals(mode)
+                    &&
+                    !"mentions".equals(mode)
+                    &&
+                    !"off".equals(mode)) {
+
+                return;
+            }
+
+            NotificationSettings
+                    .setMessageMode(
+                            WebAppActivity.this,
+                            mode
+                    );
+        }
+
+        @JavascriptInterface
+        public void setClassEnabled(
+                String className,
+                boolean value
+        ) {
+
+            NotificationSettings
+                    .setClassEnabled(
+                            WebAppActivity.this,
+                            className,
+                            value
+                    );
+        }
+
+        @JavascriptInterface
+        public boolean isAppEnabled() {
+
+            return NotificationSettings
+                    .isAppEnabled(
+                            WebAppActivity.this
+                    );
+        }
+
+        @JavascriptInterface
+        public boolean isGlobalEnabled() {
+
+            return NotificationSettings
+                    .isGlobalEnabled(
+                            WebAppActivity.this
+                    );
+        }
+
+        @JavascriptInterface
+        public boolean isAnnouncementEnabled() {
+
+            return NotificationSettings
+                    .isAnnouncementEnabled(
+                            WebAppActivity.this
+                    );
+        }
+
+        @JavascriptInterface
+        public boolean isWebAppEnabled() {
+
+            return NotificationSettings
+                    .isWebAppEnabled(
+                            WebAppActivity.this
+                    );
+        }
+
+        @JavascriptInterface
+        public String getMessageMode() {
+
+            return NotificationSettings
+                    .getMessageMode(
+                            WebAppActivity.this
+                    );
+        }
+
+        @JavascriptInterface
+        public boolean isClassEnabled(
+                String className
+        ) {
+
+            return NotificationSettings
+                    .isClassEnabled(
+                            WebAppActivity.this,
+                            className
+                    );
+        }
+    }
+
+    private void getFCMToken() {
+
+        FirebaseMessaging
+                .getInstance()
+                .getToken()
+                .addOnSuccessListener(
+                        token -> {
+
+                            /*
+                             * Token ko backend ke
+                             * authenticated user ke
+                             * account se link karo.
+                             */
+                        }
+                );
+    }
+
+    private void requestNotificationPermission() {
+
+        if (Build.VERSION.SDK_INT >= 33) {
+
+            if (
+                    ActivityCompat.checkSelfPermission(
+                            this,
+                            Manifest.permission
+                                    .POST_NOTIFICATIONS
+                    )
+                    != PackageManager
+                            .PERMISSION_GRANTED
+            ) {
+
+                ActivityCompat.requestPermissions(
+                        this,
+                        new String[]{
+                                Manifest.permission
+                                        .POST_NOTIFICATIONS
+                        },
+                        NOTIFICATION_PERMISSION
+                );
+            }
+        }
     }
 
     private void hideNavigationBar() {
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.R) {
 
             WindowInsetsController controller =
-                    getWindow().getInsetsController();
+                    getWindow()
+                            .getInsetsController();
 
             if (controller != null) {
 
                 controller.hide(
-                        WindowInsets.Type.navigationBars()
+                        WindowInsets.Type
+                                .navigationBars()
                 );
 
                 controller.setSystemBarsBehavior(
@@ -151,131 +355,38 @@ public class WebAppActivity extends Activity {
             getWindow()
                     .getDecorView()
                     .setSystemUiVisibility(
+                            View.SYSTEM_UI_FLAG_FULLSCREEN
+                                    |
                             View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                                    |
+                            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                                    |
+                            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                                    |
+                            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                     );
         }
     }
 
-    private void requestNotificationPermission() {
+    @Override
+    protected void onResume() {
 
-        if (Build.VERSION.SDK_INT >= 33) {
+        super.onResume();
 
-            if (ActivityCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-            ) != PackageManager.PERMISSION_GRANTED) {
-
-                ActivityCompat.requestPermissions(
-                        this,
-                        new String[]{
-                                Manifest.permission.POST_NOTIFICATIONS
-                        },
-                        NOTIFICATION_PERMISSION
-                );
-            }
-        }
+        hideNavigationBar();
     }
 
-    private void createNotificationChannel() {
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-
-            NotificationChannel channel =
-                    new NotificationChannel(
-                            CHANNEL_ID,
-                            "Student Hub",
-                            NotificationManager.IMPORTANCE_HIGH
-                    );
-
-            channel.setDescription(
-                    "Student Hub app notifications"
-            );
-
-            channel.enableVibration(true);
-
-            NotificationManager manager =
-                    getSystemService(
-                            NotificationManager.class
-                    );
-
-            if (manager != null) {
-                manager.createNotificationChannel(channel);
-            }
-        }
-    }
-
-    public void sendAppNotification(
-            String title,
-            String message
+    @Override
+    public void onWindowFocusChanged(
+            boolean hasFocus
     ) {
 
-        if (Build.VERSION.SDK_INT >= 33) {
-
-            if (ActivityCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-            ) != PackageManager.PERMISSION_GRANTED) {
-
-                return;
-            }
-        }
-
-        Intent intent =
-                new Intent(
-                        this,
-                        WebAppActivity.class
-                );
-
-        intent.addFlags(
-                Intent.FLAG_ACTIVITY_CLEAR_TOP
+        super.onWindowFocusChanged(
+                hasFocus
         );
 
-        PendingIntent pendingIntent =
-                PendingIntent.getActivity(
-                        this,
-                        0,
-                        intent,
-                        PendingIntent.FLAG_UPDATE_CURRENT
-                                | PendingIntent.FLAG_IMMUTABLE
-                );
-
-        NotificationCompat.Builder notification =
-                new NotificationCompat.Builder(
-                        this,
-                        CHANNEL_ID
-                )
-                        .setSmallIcon(
-                                android.R.drawable.ic_dialog_info
-                        )
-                        .setContentTitle(title)
-                        .setContentText(message)
-                        .setStyle(
-                                new NotificationCompat
-                                        .BigTextStyle()
-                                        .bigText(message)
-                        )
-                        .setPriority(
-                                NotificationCompat.PRIORITY_HIGH
-                        )
-                        .setAutoCancel(true)
-                        .setContentIntent(
-                                pendingIntent
-                        );
-
-        NotificationManager manager =
-                (NotificationManager)
-                        getSystemService(
-                                NOTIFICATION_SERVICE
-                        );
-
-        if (manager != null) {
-
-            manager.notify(
-                    (int) System.currentTimeMillis(),
-                    notification.build()
-            );
+        if (hasFocus) {
+            hideNavigationBar();
         }
     }
 
@@ -296,22 +407,35 @@ public class WebAppActivity extends Activity {
             return;
         }
 
-        if (cb == null) {
+        if (fileCallback == null) {
             return;
         }
 
         Uri[] results = null;
 
-        if (resultCode == RESULT_OK && data != null) {
+        if (
+                resultCode == RESULT_OK
+                &&
+                data != null
+        ) {
 
-            if (data.getClipData() != null) {
+            if (
+                    data.getClipData()
+                    != null
+            ) {
 
                 int count =
-                        data.getClipData().getItemCount();
+                        data.getClipData()
+                                .getItemCount();
 
-                results = new Uri[count];
+                results =
+                        new Uri[count];
 
-                for (int i = 0; i < count; i++) {
+                for (
+                        int i = 0;
+                        i < count;
+                        i++
+                ) {
 
                     results[i] =
                             data.getClipData()
@@ -319,7 +443,9 @@ public class WebAppActivity extends Activity {
                                     .getUri();
                 }
 
-            } else if (data.getData() != null) {
+            } else if (
+                    data.getData() != null
+            ) {
 
                 results =
                         new Uri[]{
@@ -328,36 +454,23 @@ public class WebAppActivity extends Activity {
             }
         }
 
-        cb.onReceiveValue(results);
-        cb = null;
-    }
+        fileCallback.onReceiveValue(
+                results
+        );
 
-    @Override
-    protected void onResume() {
-
-        super.onResume();
-
-        hideNavigationBar();
-    }
-
-    @Override
-    public void onWindowFocusChanged(
-            boolean hasFocus
-    ) {
-
-        super.onWindowFocusChanged(hasFocus);
-
-        if (hasFocus) {
-            hideNavigationBar();
-        }
+        fileCallback = null;
     }
 
     @Override
     public void onBackPressed() {
 
-        if (w != null && w.canGoBack()) {
+        if (
+                webView != null
+                &&
+                webView.canGoBack()
+        ) {
 
-            w.goBack();
+            webView.goBack();
 
         } else {
 
@@ -368,11 +481,13 @@ public class WebAppActivity extends Activity {
     @Override
     protected void onDestroy() {
 
-        if (w != null) {
+        if (webView != null) {
 
-            w.stopLoading();
-            w.destroy();
-            w = null;
+            webView.stopLoading();
+
+            webView.destroy();
+
+            webView = null;
         }
 
         super.onDestroy();
