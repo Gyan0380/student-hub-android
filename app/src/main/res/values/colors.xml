@@ -1,0 +1,29 @@
+<resources>
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+
+    <!-- Same palette as the web app's :root theme variables (style.css) -->
+    <color name="blue">#2563EB</color>
+    <color name="blue_dark">#1D4ED8</color>
+    <color name="bg">#F3F4F6</color>
+    <color name="line">#E5E7EB</color>
+    <color name="ink">#111827</color>
+    <color name="muted">#6B7280</color>
+    <color name="label">#4B5563</color>
+    <color name="green">#16A34A</color>
+    <color name="red">#DC2626</color>
+    <color name="amber">#D97706</color>
+    <color name="card_bg">#FFFFFF</color>
+    <color name="input_bg">#F9FAFB</color>
+    <color name="soft_accent">#EFF6FF</color>
+    <color name="chip_bg">#E0E7FF</color>
+    <color name="chip_ink">#3730A3</color>
+
+    <!-- Option icon backgrounds (match home options colors on web) -->
+    <color name="ic_blue">#DBEAFE</color>
+    <color name="ic_purple">#EDE9FE</color>
+    <color name="ic_amber">#FEF3C7</color>
+    <color name="ic_cyan">#E0F2FE</color>
+    <color name="ic_red">#FEE2E2</color>
+    <color name="ic_green">#DCFCE7</color>
+</resources>

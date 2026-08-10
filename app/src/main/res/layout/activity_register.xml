@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📝 Create Account"
+            android:textColor="@color/ink"
+            android:textSize="19sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/card_bg"
+            android:padding="20dp">
+
+            <TextView style="@style/FieldLabel" android:text="Full Name" />
+            <EditText android:id="@+id/inputFullName" style="@style/FieldInput" android:hint="Ravi Kumar" android:inputType="textPersonName" />
+
+            <TextView style="@style/FieldLabel" android:text="Username" />
+            <EditText android:id="@+id/inputUsername" style="@style/FieldInput" android:hint="ravi_kumar" android:inputType="text" />
+
+            <TextView style="@style/FieldLabel" android:text="Password" />
+            <EditText android:id="@+id/inputPassword" style="@style/FieldInput" android:hint="•••••••• (min 6 chars)" android:inputType="textPassword" />
+
+            <TextView style="@style/FieldLabel" android:text="Date of Birth (DD/MM/YYYY)" />
+            <EditText android:id="@+id/inputDob" style="@style/FieldInput" android:hint="15/08/2010" android:inputType="date" />
+
+            <TextView style="@style/FieldLabel" android:text="Class Level" />
+            <Spinner
+                android:id="@+id/spinnerClass"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/input_bordered_bg"
+                android:padding="10dp" />
+
+            <TextView style="@style/FieldLabel" android:text="School Name" />
+            <EditText android:id="@+id/inputSchool" style="@style/FieldInput" android:hint="DAV Public School" android:inputType="text" />
+
+            <Button
+                android:id="@+id/buttonRegister"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:background="@drawable/primary_button_bg"
+                android:text="Register"
+                android:textColor="@color/white"
+                android:textStyle="bold"
+                android:paddingVertical="12dp" />
+
+            <ProgressBar
+                android:id="@+id/progressBar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginTop="10dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/linkLogin"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginTop="16dp"
+                android:text="Already have an account? Login"
+                android:textColor="@color/blue"
+                android:textStyle="bold"
+                android:textSize="13sp" />
+
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>
