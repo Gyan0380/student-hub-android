@@ -1,0 +1,53 @@
+name: Build STUDENT HUB APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Write google-services.json
+        # Add your file's full JSON content as a repo secret named GOOGLE_SERVICES_JSON
+        # (Settings -> Secrets and variables -> Actions -> New repository secret).
+        # The build will fail without this file, since the Firebase Gradle plugin requires it.
+        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json
+
+      # This repo intentionally does NOT commit gradle/wrapper/gradle-wrapper.jar
+      # (it's a binary blob — see README-NATIVE.md for why). This step uses the
+      # gradle/actions/setup-gradle action to fetch an official, checksum-verified
+      # Gradle build and use it to (re)generate an authentic wrapper jar before
+      # building, so ./gradlew works for the rest of this workflow.
+      - name: Set up Gradle & generate wrapper
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Generate gradle-wrapper.jar
+        run: gradle wrapper --gradle-version 8.9
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: STUDENT-HUB-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk

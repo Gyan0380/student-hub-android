@@ -1,0 +1,44 @@
+plugins {
+    id 'com.android.application'
+    // Applies the google-services.json config so FirebaseApp.initializeApp() works automatically
+    id 'com.google.gms.google-services'
+}
+
+android {
+    namespace 'com.studenthub.app'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.studenthub.app'
+        minSdk 23
+        targetSdk 35
+        versionCode 1
+        versionName '1.0'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.recyclerview:recyclerview:1.3.2'
+    implementation 'com.google.android.material:material:1.12.0'
+
+    // Firebase BoM (Bill of Materials) — locks all Firebase libraries to compatible versions.
+    // You do NOT specify a version number on the individual firebase deps below because of this.
+    implementation platform('com.google.firebase:firebase-bom:33.5.1')
+
+    // Firebase Realtime Database — this is the exact library needed for real-time
+    // cross-platform sync (Android <-> Web) via a shared Realtime Database instance.
+    implementation 'com.google.firebase:firebase-database'
+
+    // Optional but recommended: Anonymous Auth so each device/browser gets a stable
+    // unique ID (senderId) without building a login screen. The Web App should use
+    // the same Firebase project + Anonymous Auth (or its own senderId scheme) for
+    // messages to be attributable, though it is not required for basic sync to work.
+    implementation 'com.google.firebase:firebase-auth'
+}
