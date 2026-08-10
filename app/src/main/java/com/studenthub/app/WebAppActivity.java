@@ -11,30 +11,38 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
-import androidx.annotation.Nullable;
 import androidx.webkit.WebViewAssetLoader;
 import androidx.webkit.WebViewClientCompat;
 
 public class WebAppActivity extends Activity {
 
-    private WebView w;
-    private ValueCallback<Uri[]> cb;
+    private WebView webView;
+    private ValueCallback<Uri[]> fileCallback;
+
+    private static final int FILE_CHOOSER_REQUEST = 1001;
 
     @Override
-    protected void onCreate(Bundle b) {
-        super.onCreate(b);
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
 
-        w = new WebView(this);
-        setContentView(w);
+        webView = new WebView(this);
+        setContentView(webView);
 
-        WebSettings s = w.getSettings();
-        s.setJavaScriptEnabled(true);
-        s.setDomStorageEnabled(true);
-        s.setAllowFileAccess(false);
-        s.setAllowContentAccess(true);
-        s.setMediaPlaybackRequiresUserGesture(false);
+        WebSettings settings = webView.getSettings();
 
-        WebViewAssetLoader loader =
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
+
+        settings.setAllowFileAccess(false);
+        settings.setAllowContentAccess(true);
+
+        settings.setMediaPlaybackRequiresUserGesture(false);
+
+        settings.setJavaScriptCanOpenWindowsAutomatically(true);
+        settings.setSupportMultipleWindows(false);
+
+        WebViewAssetLoader assetLoader =
                 new WebViewAssetLoader.Builder()
                         .addPathHandler(
                                 "/assets/",
@@ -42,89 +50,126 @@ public class WebAppActivity extends Activity {
                         )
                         .build();
 
-        w.setWebViewClient(new WebViewClientCompat() {
+        webView.setWebViewClient(new WebViewClientCompat() {
+
             @Override
             public WebResourceResponse shouldInterceptRequest(
                     WebView view,
                     WebResourceRequest request
             ) {
-                return loader.shouldInterceptRequest(request.getUrl());
+                return assetLoader.shouldInterceptRequest(
+                        request.getUrl()
+                );
             }
         });
 
-        w.setWebChromeClient(new WebChromeClient() {
+        webView.setWebChromeClient(new WebChromeClient() {
+
             @Override
             public boolean onShowFileChooser(
-                    WebView view,
+                    WebView webView,
                     ValueCallback<Uri[]> callback,
                     FileChooserParams params
             ) {
-                cb = callback;
+
+                fileCallback = callback;
 
                 try {
                     Intent intent = params.createIntent();
-                    intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
 
-                    startActivityForResult(intent, 42);
+                    intent.putExtra(
+                            Intent.EXTRA_ALLOW_MULTIPLE,
+                            true
+                    );
+
+                    startActivityForResult(
+                            intent,
+                            FILE_CHOOSER_REQUEST
+                    );
 
                     return true;
+
                 } catch (Exception e) {
-                    cb = null;
+
+                    fileCallback = null;
+
                     return false;
                 }
             }
         });
 
+        /*
+         * Default page
+         */
         String page = getIntent().getStringExtra("page");
 
-        if (page != null && !page.isEmpty()) {
-            w.loadUrl(page);
-        } else {
-            w.loadUrl("file:///android_asset/index.html");
+        if (page == null || page.trim().isEmpty()) {
+            page = "index.html";
         }
+
+        /*
+         * IMPORTANT:
+         * Files are loaded from APK assets.
+         */
+        String url =
+                "https://appassets.androidplatform.net/assets/studenthub/"
+                        + page;
+
+        webView.loadUrl(url);
     }
 
     @Override
     protected void onActivityResult(
             int requestCode,
             int resultCode,
-            @Nullable Intent data
+            Intent data
     ) {
-        super.onActivityResult(requestCode, resultCode, data);
 
-        if (requestCode != 42 || cb == null) {
+        super.onActivityResult(
+                requestCode,
+                resultCode,
+                data
+        );
+
+        if (requestCode != FILE_CHOOSER_REQUEST) {
             return;
         }
 
-        Uri[] results = null;
-
-        if (resultCode == RESULT_OK && data != null) {
-
-            if (data.getClipData() != null) {
-
-                int count = data.getClipData().getItemCount();
-                results = new Uri[count];
-
-                for (int i = 0; i < count; i++) {
-                    results[i] = data.getClipData()
-                            .getItemAt(i)
-                            .getUri();
-                }
-
-            } else if (data.getData() != null) {
-                results = new Uri[]{data.getData()};
-            }
+        if (fileCallback == null) {
+            return;
         }
 
-        cb.onReceiveValue(results);
-        cb = null;
+        Uri[] results =
+                WebChromeClient.FileChooserParams.parseResult(
+                        resultCode,
+                        data
+                );
+
+        fileCallback.onReceiveValue(results);
+
+        fileCallback = null;
+    }
+
+    @Override
+    public void onBackPressed() {
+
+        if (webView != null && webView.canGoBack()) {
+
+            webView.goBack();
+
+        } else {
+
+            super.onBackPressed();
+        }
     }
 
     @Override
     protected void onDestroy() {
-        if (w != null) {
-            w.destroy();
-            w = null;
+
+        if (webView != null) {
+
+            webView.stopLoading();
+            webView.destroy();
         }
 
         super.onDestroy();
