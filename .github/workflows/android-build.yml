@@ -42,3 +42,4 @@ jobs:
           name: student-hub-debug-apk
           path: "**/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
+
