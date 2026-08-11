@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.studenthub.app.data.model.AppTag
 import com.studenthub.app.data.model.AppUser
 import com.studenthub.app.data.model.CLASS_ROOM_OPTIONS
+import com.studenthub.app.ui.theme.glassMorphism // <-- Glassmorphism Theme Import
 
 private val ROLE_OPTIONS = listOf("Student", "Admin", "Owner")
 private val TIMEOUT_HOUR_OPTIONS = listOf(1, 6, 24, 72)
@@ -100,7 +101,7 @@ private fun UsersTab(vm: AdminViewModel, currentUser: AppUser) {
                     onToggleExpand = { expandedUid = if (expandedUid == u.uid) null else u.uid },
                     vm = vm
                 )
-                HorizontalDivider()
+                Spacer(modifier = Modifier.height(4.dp))
             }
         }
     }
@@ -115,7 +116,12 @@ private fun UserRow(
     onToggleExpand: () -> Unit,
     vm: AdminViewModel
 ) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .glassMorphism() // <-- Glassmorphism applied to User Row
+    ) {
         Row(
             Modifier.fillMaxWidth().clickable(onClick = onToggleExpand),
             verticalAlignment = Alignment.CenterVertically
@@ -133,7 +139,7 @@ private fun UserRow(
         }
 
         if (expanded) {
-            Column(Modifier.padding(top = 8.dp, start = 4.dp)) {
+            Column(Modifier.padding(top = 12.dp)) {
                 // Role
                 Text("Role", style = MaterialTheme.typography.labelMedium)
                 Row {
@@ -208,18 +214,24 @@ private fun TagsTab(vm: AdminViewModel) {
     var label by remember { mutableStateOf("") }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.fillMaxWidth().glassMorphism(), // <-- Glassmorphism applied to Tag Input
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             OutlinedTextField(
                 value = label, onValueChange = { label = it },
                 modifier = Modifier.weight(1f),
                 placeholder = { Text("New tag label (e.g. Verified)") },
                 singleLine = true
             )
-            TextButton(onClick = { vm.createTag(label, "#2563EB"); label = "" }) { Text("Add") }
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(onClick = { vm.createTag(label, "#2563EB"); label = "" }) { Text("Add") }
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(16.dp))
         LazyColumn {
-            items(tags, key = { it.id }) { tag -> TagRow(tag, onDelete = { vm.deleteTag(tag.id) }) }
+            items(tags, key = { it.id }) { tag -> 
+                TagRow(tag, onDelete = { vm.deleteTag(tag.id) }) 
+            }
         }
     }
 }
@@ -228,12 +240,15 @@ private fun TagsTab(vm: AdminViewModel) {
 @Composable
 private fun TagRow(tag: AppTag, onDelete: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .glassMorphism(), // <-- Glassmorphism applied to each Tag item
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(tag.label)
-        TextButton(onClick = onDelete) { Text("Delete") }
+        Text(tag.label, style = MaterialTheme.typography.titleMedium)
+        TextButton(onClick = onDelete) { Text("Delete", color = MaterialTheme.colorScheme.error) }
     }
 }
 
@@ -247,25 +262,37 @@ private fun AntiAbuseTab(vm: AdminViewModel) {
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text("Blocked words are filtered/flagged in chat.", style = MaterialTheme.typography.bodySmall)
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Spacer(Modifier.height(12.dp))
+        
+        Row(
+            modifier = Modifier.fillMaxWidth().glassMorphism(), // <-- Glassmorphism applied to Input
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             OutlinedTextField(
                 value = newWord, onValueChange = { newWord = it },
                 modifier = Modifier.weight(1f),
                 placeholder = { Text("Add word…") },
                 singleLine = true
             )
-            TextButton(onClick = { vm.addAntiAbuseWord(newWord); newWord = "" }) { Text("Add") }
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(onClick = { vm.addAntiAbuseWord(newWord); newWord = "" }) { Text("Add") }
         }
-        Spacer(Modifier.height(12.dp))
+        
+        Spacer(Modifier.height(16.dp))
         LazyColumn {
             items(words) { word ->
                 Row(
-                    Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp)
+                        .glassMorphism(), // <-- Glassmorphism applied to each Word item
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(word)
-                    TextButton(onClick = { vm.removeAntiAbuseWord(word) }) { Text("Remove") }
+                    Text(word, style = MaterialTheme.typography.bodyLarge)
+                    TextButton(onClick = { vm.removeAntiAbuseWord(word) }) { 
+                        Text("Remove", color = MaterialTheme.colorScheme.error) 
+                    }
                 }
             }
         }
@@ -283,21 +310,28 @@ private fun NotifyTab(vm: AdminViewModel) {
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text("Broadcast a push notification to all users.", style = MaterialTheme.typography.bodySmall)
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(
-            value = title, onValueChange = { title = it },
-            modifier = Modifier.fillMaxWidth(), label = { Text("Title") }, singleLine = true
-        )
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(
-            value = body, onValueChange = { body = it },
-            modifier = Modifier.fillMaxWidth(), label = { Text("Message") }, minLines = 3
-        )
-        Spacer(Modifier.height(12.dp))
-        Button(
-            onClick = { vm.sendNotification(title, body, "all"); title = ""; body = "" },
-            enabled = !sending && (title.isNotBlank() || body.isNotBlank()),
-            modifier = Modifier.fillMaxWidth()
-        ) { Text(if (sending) "Sending…" else "Send to all users") }
+        Spacer(Modifier.height(16.dp))
+        
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .glassMorphism() // <-- Glassmorphism applied to Notification Form
+        ) {
+            OutlinedTextField(
+                value = title, onValueChange = { title = it },
+                modifier = Modifier.fillMaxWidth(), label = { Text("Title") }, singleLine = true
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = body, onValueChange = { body = it },
+                modifier = Modifier.fillMaxWidth(), label = { Text("Message") }, minLines = 3
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = { vm.sendNotification(title, body, "all"); title = ""; body = "" },
+                enabled = !sending && (title.isNotBlank() || body.isNotBlank()),
+                modifier = Modifier.fillMaxWidth()
+            ) { Text(if (sending) "Sending…" else "Send to all users") }
+        }
     }
 }
