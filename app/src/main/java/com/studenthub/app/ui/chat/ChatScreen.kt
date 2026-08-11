@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.studenthub.app.data.model.Message
 import com.studenthub.app.util.ImageUtils
+import com.studenthub.app.ui.theme.glassMorphism // <-- Glassmorphism Theme Import Kiya Gaya Hai
 
 private val MENTION_REGEX = Regex("(?<![\\w.])@\\w+")
 
@@ -146,15 +147,17 @@ private fun MessageBubble(message: Message, mentioned: Boolean, onTap: () -> Uni
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .let {
-                if (mentioned) it.background(
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                    RoundedCornerShape(12.dp)
-                ) else it
-            },
+            // Glassmorphism modifier apply kiya gaya hai messages ke upar
+            .glassMorphism(
+                backgroundAlpha = if (mentioned) 0.3f else 0.15f,
+                borderAlpha = if (mentioned) 0.6f else 0.2f
+            ),
+        // Card ka background transparent set kiya gaya hai taaki Glass theme dikh sake
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         onClick = onTap
     ) {
-        Column(Modifier.padding(10.dp)) {
+        // Padding adjust ki gayi hai kyunki glassMorphism mein already 16dp padding hai
+        Column(Modifier.padding(0.dp)) {
             Text(message.senderName, style = MaterialTheme.typography.labelMedium)
             message.replyTo?.let {
                 Text("↩️ ${it.senderName}: ${it.text.take(40)}", style = MaterialTheme.typography.bodySmall)
