@@ -10,7 +10,11 @@ import androidx.compose.ui.unit.dp
 import com.studenthub.app.ui.theme.glassMorphism
 
 @Composable
-fun LoginScreen(onLoginSuccess: () -> Unit, onForgotPassword: () -> Unit) {
+fun LoginScreen(
+    onLoggedIn: () -> Unit, 
+    onGoRegister: () -> Unit, 
+    onGoForgotPassword: () -> Unit
+) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
@@ -18,7 +22,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onForgotPassword: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.85f)
-                .glassMorphism(),
+                .glassMorphism(), // Glassmorphism Theme
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text("Student Hub", style = MaterialTheme.typography.headlineMedium)
@@ -26,14 +30,35 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onForgotPassword: () -> Unit) {
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email Address") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(
+                value = email, 
+                onValueChange = { email = it }, 
+                label = { Text("Email Address") }, 
+                modifier = Modifier.fillMaxWidth()
+            )
             Spacer(modifier = Modifier.height(12.dp))
             
-            OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(
+                value = password, 
+                onValueChange = { password = it }, 
+                label = { Text("Password") }, 
+                visualTransformation = PasswordVisualTransformation(), 
+                modifier = Modifier.fillMaxWidth()
+            )
             Spacer(modifier = Modifier.height(24.dp))
             
-            Button(onClick = onLoginSuccess, modifier = Modifier.fillMaxWidth()) { Text("Login") }
-            TextButton(onClick = onForgotPassword) { Text("Forgot Password?") }
+            Button(onClick = onLoggedIn, modifier = Modifier.fillMaxWidth()) { 
+                Text("Login") 
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            TextButton(onClick = onGoRegister) { 
+                Text("Don't have an account? Sign up") 
+            }
+            TextButton(onClick = onGoForgotPassword) { 
+                Text("Forgot Password?") 
+            }
         }
     }
 }
