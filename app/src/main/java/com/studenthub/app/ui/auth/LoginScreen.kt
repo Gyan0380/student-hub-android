@@ -3,51 +3,37 @@ package com.studenthub.app.ui.auth
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.studenthub.app.ui.theme.glassMorphism
 
 @Composable
-fun LoginScreen(
-    onLoggedIn: () -> Unit,
-    onGoRegister: () -> Unit,
-    onGoForgotPassword: () -> Unit,
-    vm: AuthViewModel = viewModel()
-) {
+fun LoginScreen(onLoginSuccess: () -> Unit, onForgotPassword: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    val state by vm.state.collectAsState()
 
-    LaunchedEffect(state) {
-        if (state is AuthUiState.Success) onLoggedIn()
-    }
-
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text("StudentHub", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(24.dp))
-        OutlinedTextField(email, { email = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(
-            password, { password = it }, label = { Text("Password") },
-            visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(Modifier.height(16.dp))
-        if (state is AuthUiState.Error) {
-            Text((state as AuthUiState.Error).message, color = MaterialTheme.colorScheme.error)
-            Spacer(Modifier.height(8.dp))
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .glassMorphism(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Student Hub", style = MaterialTheme.typography.headlineMedium)
+            Text("Web-Synced Login", style = MaterialTheme.typography.bodySmall)
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email Address") }, modifier = Modifier.fillMaxWidth())
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Button(onClick = onLoginSuccess, modifier = Modifier.fillMaxWidth()) { Text("Login") }
+            TextButton(onClick = onForgotPassword) { Text("Forgot Password?") }
         }
-        Button(
-            onClick = { vm.login(email, password) },
-            enabled = state !is AuthUiState.Loading,
-            modifier = Modifier.fillMaxWidth()
-        ) { Text(if (state is AuthUiState.Loading) "Signing in…" else "Login") }
-        Spacer(Modifier.height(4.dp))
-        TextButton(onClick = { vm.resetState(); onGoRegister() }) { Text("New here? Create an account") }
-        TextButton(onClick = { vm.resetState(); onGoForgotPassword() }) { Text("Forgot password?") }
     }
 }
