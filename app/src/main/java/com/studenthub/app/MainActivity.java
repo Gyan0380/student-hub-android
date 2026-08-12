@@ -10,50 +10,1536 @@ import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.*;
+
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+
 import com.google.android.material.button.MaterialButton;
+import com.google.firebase.Timestamp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.*;
 import com.google.firebase.messaging.FirebaseMessaging;
+
 import java.util.*;
 
 public class MainActivity extends AppCompatActivity {
-    FirebaseAuth auth; FirebaseFirestore db; FirebaseUser fbUser; Map<String,Object> me=new HashMap<>();
-    LinearLayout root, content; ListenerRegistration userListener, chatListener, notifListener, rulesListener;
-    TextView title; String currentRoom="global"; boolean anonymous=false;
-    int white=Color.rgb(244,247,255), muted=Color.rgb(170,179,204), bg=Color.rgb(11,16,32), card=Color.rgb(21,28,50), purple=Color.rgb(108,99,255);
-    @Override protected void onCreate(Bundle b){super.onCreate(b); auth=FirebaseAuth.getInstance(); db=FirebaseFirestore.getInstance(); if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.POST_NOTIFICATIONS},40); if(auth.getCurrentUser()!=null) loadUser(auth.getCurrentUser()); else showLogin();}
-    TextView tv(String s,int sp){TextView v=new TextView(this);v.setText(s);v.setTextColor(white);v.setTextSize(sp);v.setPadding(16,12,16,12);return v;}
-    EditText input(String hint){EditText e=new EditText(this);e.setHint(hint);e.setHintTextColor(muted);e.setTextColor(white);e.setSingleLine();e.setPadding(16,12,16,12);return e;}
-    MaterialButton btn(String s){MaterialButton b=new MaterialButton(this);b.setText(s);b.setTextColor(Color.WHITE);b.setTextSize(14);b.setAllCaps(false);b.setBackgroundColor(purple);b.setPadding(8,4,8,4);return b;}
-    void base(String heading){root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(bg); title=tv(heading,22);title.setGravity(Gravity.CENTER_VERTICAL);root.addView(title,new LinearLayout.LayoutParams(-1,64)); content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL); ScrollView sv=new ScrollView(this);sv.addView(content);root.addView(sv,new LinearLayout.LayoutParams(-1,0,1)); setContentView(root);}
-    void showLogin(){base("🎓 StudentHub"); content.setPadding(20,20,20,20); content.addView(tv("Login",26)); EditText u=input("Username"); EditText p=input("Password");p.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);content.addView(u);content.addView(p); MaterialButton l=btn("Login");content.addView(l); TextView err=tv("",13);content.addView(err);l.setOnClickListener(v->{String un=u.getText().toString().trim().toLowerCase(),pw=p.getText().toString();if(un.isEmpty()||pw.isEmpty()){err.setText("Username and password required");return;}auth.signInWithEmailAndPassword(un+"@studentchat.com",pw).addOnSuccessListener(x->loadUser(x.getUser())).addOnFailureListener(e->err.setText("Invalid Username or Password"));}); Button r=new Button(this);r.setText("Create account");content.addView(r);r.setOnClickListener(v->showRegister()); Button f=new Button(this);f.setText("Forgot password");content.addView(f);f.setOnClickListener(v->forgot());}
-    void showRegister(){base("Create account");content.setPadding(20,20,20,20);EditText full=input("Full name"),un=input("Username"),pw=input("Password (6+ chars)"),dob=input("DOB (optional)"),cls=input("Class (e.g. Class 9)"),school=input("School name");pw.setInputType(129);for(EditText e:new EditText[]{full,un,pw,dob,cls,school})content.addView(e);MaterialButton b=btn("Create account");content.addView(b);TextView msg=tv("",13);content.addView(msg);b.setOnClickListener(v->{String username=un.getText().toString().trim().toLowerCase(),pass=pw.getText().toString();if(username.isEmpty()||pass.length()<6){msg.setText("Username and password (6+) required");return;}String c=cls.getText().toString().trim();if(c.isEmpty())c="Class 9";String finalC=c;auth.createUserWithEmailAndPassword(username+"@studentchat.com",pass).addOnSuccessListener(x->{Map<String,Object>d=new HashMap<>();d.put("uid",x.getUser().getUid());d.put("fullName",full.getText().toString().trim());d.put("username",username);d.put("dob",dob.getText().toString().trim().isEmpty()?"N/A":dob.getText().toString().trim());d.put("classLevel",finalC);d.put("schoolName",school.getText().toString().trim());d.put("profilePhoto","https://cdn-icons-png.flaticon.com/512/149/149071.png");d.put("bio","");d.put("role","Student");d.put("classAccess",Collections.singletonList(finalC));d.put("createdAt",FieldValue.serverTimestamp());d.put("isBanned",false);d.put("timeoutExpiry",null);db.collection("Users").document(x.getUser().getUid()).set(d).addOnSuccessListener(z->loadUser(x.getUser())).addOnFailureListener(e->msg.setText(e.getMessage()));}).addOnFailureListener(e->msg.setText(e.getMessage()));});}
-    void forgot(){final EditText u=input("Username");new AlertDialog.Builder(this).setTitle("Reset password").setView(u).setPositiveButton("Send",(d,w)->auth.sendPasswordResetEmail(u.getText().toString().trim().toLowerCase()+"@studentchat.com")).setNegativeButton("Cancel",null).show();}
-    void loadUser(FirebaseUser u){fbUser=u;db.collection("Users").document(u.getUid()).addSnapshotListener((snap,e)->{if(snap!=null&&snap.exists()){me=snap.getData();if(!isBanned()) {registerFcm();showHome();}}else showHome();});}
-    boolean isBanned(){Object b=me.get("isBanned");return Boolean.TRUE.equals(b);}
-    void registerFcm(){FirebaseMessaging.getInstance().getToken().addOnSuccessListener(t->{Map<String,Object>d=new HashMap<>();d.put("enabled",true);d.put("updatedAt",System.currentTimeMillis());db.collection("Users").document(fbUser.getUid()).collection("FcmTokens").document(t).set(d,SetOptions.merge());});}
-    void showHome(){if(userListener!=null)userListener.remove();base("🎓 StudentHub");content.setPadding(16,8,16,16);content.addView(tv("Welcome, @"+me.getOrDefault("username","Student"),18));String[] labels={"💬 Global Chat","👤 Anonymous Chat","🏫 My Class Chat","🔔 Notifications","📜 Community Rules","👤 Profile","🛠 Suggestions","🐞 Bug Report"};for(String s:labels){MaterialButton b=btn(s);content.addView(b,new LinearLayout.LayoutParams(-1,58));if(s.contains("Global"))b.setOnClickListener(v->showChat("global",false));else if(s.contains("Anonymous"))b.setOnClickListener(v->showChat("anonymous",true));else if(s.contains("My Class"))b.setOnClickListener(v->showChat(classRoom((String)me.getOrDefault("classLevel","Class 9")),false));else if(s.contains("Notifications"))b.setOnClickListener(v->showNotifications());else if(s.contains("Rules"))b.setOnClickListener(v->showRules());else if(s.contains("Profile"))b.setOnClickListener(v->showProfile());else if(s.contains("Suggestions"))b.setOnClickListener(v->simpleForm("Suggestions","Suggestions"));else if(s.contains("Bug"))b.setOnClickListener(v->simpleForm("Bug Report","BugReports"));}if(isAdmin()){MaterialButton a=btn("⚙️ Admin Panel");content.addView(a);a.setOnClickListener(v->showAdmin());}MaterialButton out=btn("🚪 Logout");content.addView(out);out.setOnClickListener(v->{auth.signOut();if(userListener!=null)userListener.remove();showLogin();});}
-    boolean isAdmin(){String r=String.valueOf(me.getOrDefault("role","Student"));return r.equals("Admin")||r.equals("Owner");}
-    String classRoom(String c){return "class-"+c.toLowerCase(Locale.US).replaceAll("[^a-z0-9]+","-").replaceAll("^-|-$","");}
-    void showChat(String room,boolean anon){currentRoom=room;anonymous=anon;base("💬 "+(anon?"Anonymous Chat":room.equals("global")?"Global Chat":"Class Chat"));content.setPadding(10,10,10,10);LinearLayout msgs=new LinearLayout(this);msgs.setOrientation(LinearLayout.VERTICAL);ScrollView sv=new ScrollView(this);sv.addView(msgs);content.addView(sv,new LinearLayout.LayoutParams(-1,0,1));LinearLayout bar=new LinearLayout(this);EditText in=input("Type a message...");MaterialButton send=btn("Send");bar.addView(in,new LinearLayout.LayoutParams(0,60,1));bar.addView(send,new LinearLayout.LayoutParams(110,60));content.addView(bar);send.setOnClickListener(v->{String text=in.getText().toString().trim();if(text.isEmpty())return;Map<String,Object>d=new HashMap<>();d.put("text",text);d.put("photos",null);d.put("photoUrl",null);d.put("senderId",fbUser.getUid());d.put("senderName",anon?"Anonymous Ninja":String.valueOf(me.getOrDefault("username","Student")));d.put("senderPhoto",me.getOrDefault("profilePhoto",""));d.put("createdAt",FieldValue.serverTimestamp());d.put("replyTo",null);db.collection("Chats").document(room).collection("Messages").add(d).addOnSuccessListener(x->in.setText("")).addOnFailureListener(e->Toast.makeText(this,"Send failed: "+e.getMessage(),Toast.LENGTH_SHORT).show());});MaterialButton back=btn("← Back");content.addView(back);back.setOnClickListener(v->showHome());chatListener=db.collection("Chats").document(room).collection("Messages").orderBy("createdAt",Query.Direction.ASCENDING).addSnapshotListener((snap,e)->{if(e!=null||snap==null)return;msgs.removeAllViews();for(DocumentSnapshot d:snap.getDocuments()){Map<String,Object>x=d.getData();String name=String.valueOf(x.getOrDefault("senderName","Student"));String text=String.valueOf(x.getOrDefault("text",""));TextView m=tv("@"+name+"\n"+text,14);m.setBackgroundColor(card);m.setPadding(14,10,14,10);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,4,0,4);msgs.addView(m,lp);}sv.post(()->sv.fullScroll(View.FOCUS_DOWN));});}
-    void showNotifications(){
-        base("🔔 Notifications");
-        LinearLayout list=new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL); content.addView(list,new LinearLayout.LayoutParams(-1,-2));
-        notifListener=db.collection("Notifications").whereIn("toUid",Arrays.asList("all",fbUser.getUid())).addSnapshotListener((snap,e)->{
-            if(e!=null||snap==null)return; list.removeAllViews();
-            List<DocumentSnapshot> items=new ArrayList<>(snap.getDocuments()); Collections.sort(items,(a,b)->Long.compare(time(b),time(a)));
-            for(DocumentSnapshot d:items){Map<String,Object>x=d.getData(); TextView n=tv(String.valueOf(x.getOrDefault("title","Announcement"))+"\n"+String.valueOf(x.getOrDefault("body",x.getOrDefault("text",""))),15); n.setBackgroundColor(card); LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2); lp.setMargins(0,6,0,6); list.addView(n,lp);}
-        });
-        MaterialButton back=btn("← Back"); content.addView(back); back.setOnClickListener(v->{if(notifListener!=null){notifListener.remove();notifListener=null;} showHome();});
+
+    FirebaseAuth auth;
+    FirebaseFirestore db;
+    FirebaseUser fbUser;
+    Map<String, Object> me = new HashMap<>();
+
+    ListenerRegistration userListener;
+    ListenerRegistration chatListener;
+    ListenerRegistration notifListener;
+    ListenerRegistration rulesListener;
+
+    LinearLayout root, content;
+    TextView title;
+
+    String currentRoom = "global";
+    boolean anonymous = false;
+
+    int white = Color.rgb(244, 247, 255);
+    int muted = Color.rgb(170, 179, 204);
+    int bg = Color.rgb(11, 16, 32);
+    int card = Color.rgb(21, 28, 50);
+    int purple = Color.rgb(108, 99, 255);
+
+    @Override
+    protected void onCreate(Bundle b) {
+        super.onCreate(b);
+
+        auth = FirebaseAuth.getInstance();
+        db = FirebaseFirestore.getInstance();
+
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+
+            ActivityCompat.requestPermissions(
+                    this,
+                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                    40
+            );
+        }
+
+        if (auth.getCurrentUser() != null) {
+            loadUser(auth.getCurrentUser());
+        } else {
+            showLogin();
+        }
     }
-    long time(DocumentSnapshot d){Object t=d.get("createdAt");return t instanceof Timestamp?((Timestamp)t).toDate().getTime():0;}
-    void showRules(){base("📜 Community Rules");TextView r=tv("Loading...",16);content.addView(r);rulesListener=db.collection("Settings").document("CommunityRules").addSnapshotListener((s,e)->{if(s!=null&&s.exists())r.setText(String.valueOf(s.get("rules")));});MaterialButton b=btn("← Back");content.addView(b);b.setOnClickListener(v->{if(rulesListener!=null)rulesListener.remove();showHome();});}
-    void showProfile(){base("👤 Profile");content.addView(tv("Username: @"+me.getOrDefault("username",""),17));content.addView(tv("Name: "+me.getOrDefault("fullName",""),17));content.addView(tv("Class: "+me.getOrDefault("classLevel",""),17));content.addView(tv("School: "+me.getOrDefault("schoolName",""),17));content.addView(tv("Role: "+me.getOrDefault("role","Student"),17));EditText bio=input("Bio");bio.setText(String.valueOf(me.getOrDefault("bio","")));content.addView(bio);MaterialButton save=btn("Save Bio");content.addView(save);save.setOnClickListener(v->db.collection("Users").document(fbUser.getUid()).update("bio",bio.getText().toString()));MaterialButton b=btn("← Back");content.addView(b);b.setOnClickListener(v->showHome());}
-    void simpleForm(String titleText,String collection){base(titleText);EditText in=input("Write here...");in.setMinLines(5);content.addView(in);MaterialButton send=btn("Submit");content.addView(send);send.setOnClickListener(v->{String t=in.getText().toString().trim();if(t.isEmpty())return;Map<String,Object>d=new HashMap<>();d.put("uid",fbUser.getUid());d.put("username",me.getOrDefault("username","Student"));d.put("text",t);d.put("createdAt",FieldValue.serverTimestamp());db.collection(collection).add(d).addOnSuccessListener(x->{Toast.makeText(this,"Submitted",Toast.LENGTH_SHORT).show();showHome();});});MaterialButton b=btn("← Back");content.addView(b);b.setOnClickListener(v->showHome());}
-    void showAdmin(){base("⚙️ Admin Panel");content.setPadding(16,8,16,16);content.addView(tv("Live admin controls",18));EditText nt=input("Notification title");EditText nb=input("Notification message");content.addView(nt);content.addView(nb);MaterialButton send=btn("📢 Send Global Notification");content.addView(send);send.setOnClickListener(v->{Map<String,Object>d=new HashMap<>();d.put("toUid","all");d.put("title",nt.getText().toString().trim().isEmpty()?"Announcement":nt.getText().toString().trim());d.put("body",nb.getText().toString().trim());d.put("createdAt",FieldValue.serverTimestamp());d.put("sentBy",me.getOrDefault("username","Admin"));db.collection("Notifications").add(d).addOnSuccessListener(x->{nt.setText("");nb.setText("");Toast.makeText(this,"Notification sent",Toast.LENGTH_SHORT).show();});});EditText rules=input("Community rules text");content.addView(rules);MaterialButton saveRules=btn("Save Community Rules");content.addView(saveRules);saveRules.setOnClickListener(v->{if(!isOwner()){Toast.makeText(this,"Owner only",Toast.LENGTH_SHORT).show();return;}db.collection("Settings").document("CommunityRules").set(Collections.singletonMap("rules",rules.getText().toString()),SetOptions.merge());});EditText words=input("Bad words, comma separated");content.addView(words);MaterialButton saveWords=btn("Save Anti-Abuse Words");content.addView(saveWords);saveWords.setOnClickListener(v->{if(!isOwner()){Toast.makeText(this,"Owner only",Toast.LENGTH_SHORT).show();return;}List<String>w=new ArrayList<>();for(String s:words.getText().toString().split(","))if(!s.trim().isEmpty())w.add(s.trim());db.collection("Settings").document("AntiAbuse").set(Collections.singletonMap("words",w),SetOptions.merge());});EditText uname=input("Username to edit role");content.addView(uname);Spinner role=new Spinner(this);role.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Student","Admin","Owner"}));content.addView(role);MaterialButton roleBtn=btn("Change Role");content.addView(roleBtn);roleBtn.setOnClickListener(v->{if(!isOwner()){Toast.makeText(this,"Owner only",Toast.LENGTH_SHORT).show();return;}db.collection("Users").whereEqualTo("username",uname.getText().toString().trim().toLowerCase()).limit(1).get().addOnSuccessListener(s->{if(s.isEmpty()){Toast.makeText(this,"User not found",Toast.LENGTH_SHORT).show();return;}s.getDocuments().get(0).getReference().update("role",role.getSelectedItem().toString());});});MaterialButton back=btn("← Back");content.addView(back);back.setOnClickListener(v->showHome());}
-    boolean isOwner(){return "Owner".equals(String.valueOf(me.getOrDefault("role","Student")));}
-    @Override protected void onDestroy(){if(userListener!=null)userListener.remove();if(chatListener!=null)chatListener.remove();if(notifListener!=null)notifListener.remove();if(rulesListener!=null)rulesListener.remove();super.onDestroy();}
-}
+
+    TextView tv(String s, int sp) {
+        TextView v = new TextView(this);
+        v.setText(s);
+        v.setTextColor(white);
+        v.setTextSize(sp);
+        v.setPadding(16, 12, 16, 12);
+        return v;
+    }
+
+    EditText input(String hint) {
+        EditText e = new EditText(this);
+        e.setHint(hint);
+        e.setHintTextColor(muted);
+        e.setTextColor(white);
+        e.setSingleLine();
+        e.setPadding(16, 12, 16, 12);
+        return e;
+    }
+
+    MaterialButton btn(String s) {
+        MaterialButton b = new MaterialButton(this);
+        b.setText(s);
+        b.setTextColor(Color.WHITE);
+        b.setTextSize(14);
+        b.setAllCaps(false);
+        b.setBackgroundColor(purple);
+        b.setPadding(8, 4, 8, 4);
+        return b;
+    }
+
+    void base(String heading) {
+
+        root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(bg);
+
+        title = tv(heading, 22);
+        title.setGravity(Gravity.CENTER_VERTICAL);
+
+        root.addView(
+                title,
+                new LinearLayout.LayoutParams(-1, 64)
+        );
+
+        content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+
+        ScrollView sv = new ScrollView(this);
+        sv.addView(content);
+
+        root.addView(
+                sv,
+                new LinearLayout.LayoutParams(-1, 0, 1)
+        );
+
+        setContentView(root);
+    }
+
+    void showLogin() {
+
+        base("🎓 StudentHub");
+
+        content.setPadding(20, 20, 20, 20);
+
+        content.addView(tv("Login", 26));
+
+        EditText u = input("Username");
+
+        EditText p = input("Password");
+        p.setInputType(
+                InputType.TYPE_CLASS_TEXT |
+                        InputType.TYPE_TEXT_VARIATION_PASSWORD
+        );
+
+        content.addView(u);
+        content.addView(p);
+
+        MaterialButton l = btn("Login");
+        content.addView(l);
+
+        TextView err = tv("", 13);
+        content.addView(err);
+
+        l.setOnClickListener(v -> {
+
+            String un = u.getText()
+                    .toString()
+                    .trim()
+                    .toLowerCase();
+
+            String pw = p.getText().toString();
+
+            if (un.isEmpty() || pw.isEmpty()) {
+                err.setText("Username and password required");
+                return;
+            }
+
+            auth.signInWithEmailAndPassword(
+                            un + "@studentchat.com",
+                            pw
+                    )
+                    .addOnSuccessListener(
+                            x -> loadUser(x.getUser())
+                    )
+                    .addOnFailureListener(
+                            e -> err.setText(
+                                    "Invalid Username or Password"
+                            )
+                    );
+        });
+
+        Button r = new Button(this);
+        r.setText("Create account");
+
+        content.addView(r);
+
+        r.setOnClickListener(v -> showRegister());
+
+        Button f = new Button(this);
+        f.setText("Forgot password");
+
+        content.addView(f);
+
+        f.setOnClickListener(v -> forgot());
+    }
+
+    void showRegister() {
+
+        base("Create account");
+
+        content.setPadding(20, 20, 20, 20);
+
+        EditText full = input("Full name");
+        EditText un = input("Username");
+        EditText pw = input("Password (6+ chars)");
+        EditText dob = input("DOB (optional)");
+        EditText cls = input("Class (e.g. Class 9)");
+        EditText school = input("School name");
+
+        pw.setInputType(129);
+
+        for (EditText e :
+                new EditText[]{
+                        full,
+                        un,
+                        pw,
+                        dob,
+                        cls,
+                        school
+                }) {
+
+            content.addView(e);
+        }
+
+        MaterialButton b = btn("Create account");
+        content.addView(b);
+
+        TextView msg = tv("", 13);
+        content.addView(msg);
+
+        b.setOnClickListener(v -> {
+
+            String username = un.getText()
+                    .toString()
+                    .trim()
+                    .toLowerCase();
+
+            String pass = pw.getText().toString();
+
+            if (username.isEmpty() || pass.length() < 6) {
+                msg.setText(
+                        "Username and password (6+) required"
+                );
+                return;
+            }
+
+            String c = cls.getText()
+                    .toString()
+                    .trim();
+
+            if (c.isEmpty()) {
+                c = "Class 9";
+            }
+
+            String finalC = c;
+
+            auth.createUserWithEmailAndPassword(
+                            username + "@studentchat.com",
+                            pass
+                    )
+                    .addOnSuccessListener(x -> {
+
+                        Map<String, Object> d =
+                                new HashMap<>();
+
+                        d.put(
+                                "uid",
+                                x.getUser().getUid()
+                        );
+
+                        d.put(
+                                "fullName",
+                                full.getText()
+                                        .toString()
+                                        .trim()
+                        );
+
+                        d.put(
+                                "username",
+                                username
+                        );
+
+                        d.put(
+                                "dob",
+                                dob.getText()
+                                        .toString()
+                                        .trim()
+                                        .isEmpty()
+                                        ? "N/A"
+                                        : dob.getText()
+                                        .toString()
+                                        .trim()
+                        );
+
+                        d.put(
+                                "classLevel",
+                                finalC
+                        );
+
+                        d.put(
+                                "schoolName",
+                                school.getText()
+                                        .toString()
+                                        .trim()
+                        );
+
+                        d.put(
+                                "profilePhoto",
+                                "https://cdn-icons-png.flaticon.com/512/149/149071.png"
+                        );
+
+                        d.put("bio", "");
+                        d.put("role", "Student");
+
+                        d.put(
+                                "classAccess",
+                                Collections.singletonList(finalC)
+                        );
+
+                        d.put(
+                                "createdAt",
+                                FieldValue.serverTimestamp()
+                        );
+
+                        d.put(
+                                "isBanned",
+                                false
+                        );
+
+                        d.put(
+                                "timeoutExpiry",
+                                null
+                        );
+
+                        db.collection("Users")
+                                .document(
+                                        x.getUser().getUid()
+                                )
+                                .set(d)
+                                .addOnSuccessListener(
+                                        z -> loadUser(x.getUser())
+                                )
+                                .addOnFailureListener(
+                                        e -> msg.setText(
+                                                e.getMessage()
+                                        )
+                                );
+
+                    })
+                    .addOnFailureListener(
+                            e -> msg.setText(
+                                    e.getMessage()
+                            )
+                    );
+        });
+    }
+
+    void forgot() {
+
+        final EditText u = input("Username");
+
+        new AlertDialog.Builder(this)
+                .setTitle("Reset password")
+                .setView(u)
+                .setPositiveButton(
+                        "Send",
+                        (d, w) ->
+                                auth.sendPasswordResetEmail(
+                                        u.getText()
+                                                .toString()
+                                                .trim()
+                                                .toLowerCase()
+                                                + "@studentchat.com"
+                                )
+                )
+                .setNegativeButton(
+                        "Cancel",
+                        null
+                )
+                .show();
+    }
+
+    void loadUser(FirebaseUser u) {
+
+        fbUser = u;
+
+        userListener =
+                db.collection("Users")
+                        .document(u.getUid())
+                        .addSnapshotListener(
+                                (snap, e) -> {
+
+                                    if (snap != null &&
+                                            snap.exists()) {
+
+                                        me = snap.getData();
+
+                                        if (!isBanned()) {
+                                            registerFcm();
+                                            showHome();
+                                        }
+
+                                    } else {
+
+                                        showHome();
+                                    }
+                                }
+                        );
+    }
+
+    boolean isBanned() {
+
+        Object b = me.get("isBanned");
+
+        return Boolean.TRUE.equals(b);
+    }
+
+    void registerFcm() {
+
+        FirebaseMessaging
+                .getInstance()
+                .getToken()
+                .addOnSuccessListener(t -> {
+
+                    Map<String, Object> d =
+                            new HashMap<>();
+
+                    d.put("enabled", true);
+                    d.put(
+                            "updatedAt",
+                            System.currentTimeMillis()
+                    );
+
+                    db.collection("Users")
+                            .document(fbUser.getUid())
+                            .collection("FcmTokens")
+                            .document(t)
+                            .set(
+                                    d,
+                                    SetOptions.merge()
+                            );
+                });
+    }
+
+    void showHome() {
+
+        if (userListener != null) {
+            // Keep the user listener active.
+        }
+
+        base("🎓 StudentHub");
+
+        content.setPadding(16, 8, 16, 16);
+
+        content.addView(
+                tv(
+                        "Welcome, @" +
+                                me.getOrDefault(
+                                        "username",
+                                        "Student"
+                                ),
+                        18
+                )
+        );
+
+        String[] labels = {
+                "💬 Global Chat",
+                "👤 Anonymous Chat",
+                "🏫 My Class Chat",
+                "🔔 Notifications",
+                "📜 Community Rules",
+                "👤 Profile",
+                "🛠 Suggestions",
+                "🐞 Bug Report"
+        };
+
+        for (String s : labels) {
+
+            MaterialButton b = btn(s);
+
+            content.addView(
+                    b,
+                    new LinearLayout.LayoutParams(
+                            -1,
+                            58
+                    )
+            );
+
+            if (s.contains("Global")) {
+
+                b.setOnClickListener(
+                        v -> showChat(
+                                "global",
+                                false
+                        )
+                );
+
+            } else if (s.contains("Anonymous")) {
+
+                b.setOnClickListener(
+                        v -> showChat(
+                                "anonymous",
+                                true
+                        )
+                );
+
+            } else if (s.contains("My Class")) {
+
+                b.setOnClickListener(
+                        v -> showChat(
+                                classRoom(
+                                        String.valueOf(
+                                                me.getOrDefault(
+                                                        "classLevel",
+                                                        "Class 9"
+                                                )
+                                        )
+                                ),
+                                false
+                        )
+                );
+
+            } else if (s.contains("Notifications")) {
+
+                b.setOnClickListener(
+                        v -> showNotifications()
+                );
+
+            } else if (s.contains("Rules")) {
+
+                b.setOnClickListener(
+                        v -> showRules()
+                );
+
+            } else if (s.contains("Profile")) {
+
+                b.setOnClickListener(
+                        v -> showProfile()
+                );
+
+            } else if (s.contains("Suggestions")) {
+
+                b.setOnClickListener(
+                        v -> simpleForm(
+                                "Suggestions",
+                                "Suggestions"
+                        )
+                );
+
+            } else if (s.contains("Bug")) {
+
+                b.setOnClickListener(
+                        v -> simpleForm(
+                                "Bug Report",
+                                "BugReports"
+                        )
+                );
+            }
+        }
+
+        if (isAdmin()) {
+
+            MaterialButton a =
+                    btn("⚙️ Admin Panel");
+
+            content.addView(a);
+
+            a.setOnClickListener(
+                    v -> showAdmin()
+            );
+        }
+
+        MaterialButton out =
+                btn("🚪 Logout");
+
+        content.addView(out);
+
+        out.setOnClickListener(v -> {
+
+            auth.signOut();
+
+            if (userListener != null) {
+                userListener.remove();
+                userListener = null;
+            }
+
+            showLogin();
+        });
+    }
+
+    boolean isAdmin() {
+
+        String r =
+                String.valueOf(
+                        me.getOrDefault(
+                                "role",
+                                "Student"
+                        )
+                );
+
+        return r.equals("Admin")
+                || r.equals("Owner");
+    }
+
+    String classRoom(String c) {
+
+        return "class-" +
+                c.toLowerCase(Locale.US)
+                        .replaceAll(
+                                "[^a-z0-9]+",
+                                "-"
+                        )
+                        .replaceAll(
+                                "^-|-$",
+                                ""
+                        );
+    }
+
+    void showChat(
+            String room,
+            boolean anon
+    ) {
+
+        currentRoom = room;
+        anonymous = anon;
+
+        base(
+                "💬 " +
+                        (
+                                anon
+                                        ? "Anonymous Chat"
+                                        : room.equals("global")
+                                        ? "Global Chat"
+                                        : "Class Chat"
+                        )
+        );
+
+        content.setPadding(
+                10,
+                10,
+                10,
+                10
+        );
+
+        LinearLayout msgs =
+                new LinearLayout(this);
+
+        msgs.setOrientation(
+                LinearLayout.VERTICAL
+        );
+
+        ScrollView sv =
+                new ScrollView(this);
+
+        sv.addView(msgs);
+
+        content.addView(
+                sv,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        0,
+                        1
+                )
+        );
+
+        LinearLayout bar =
+                new LinearLayout(this);
+
+        EditText in =
+                input("Type a message...");
+
+        MaterialButton send =
+                btn("Send");
+
+        bar.addView(
+                in,
+                new LinearLayout.LayoutParams(
+                        0,
+                        60,
+                        1
+                )
+        );
+
+        bar.addView(
+                send,
+                new LinearLayout.LayoutParams(
+                        110,
+                        60
+                )
+        );
+
+        content.addView(bar);
+
+        send.setOnClickListener(v -> {
+
+            String text =
+                    in.getText()
+                            .toString()
+                            .trim();
+
+            if (text.isEmpty()) {
+                return;
+            }
+
+            Map<String, Object> d =
+                    new HashMap<>();
+
+            d.put("text", text);
+            d.put("photos", null);
+            d.put("photoUrl", null);
+            d.put(
+                    "senderId",
+                    fbUser.getUid()
+            );
+
+            d.put(
+                    "senderName",
+                    anon
+                            ? "Anonymous Ninja"
+                            : String.valueOf(
+                                    me.getOrDefault(
+                                            "username",
+                                            "Student"
+                                    )
+                            )
+            );
+
+            d.put(
+                    "senderPhoto",
+                    me.getOrDefault(
+                            "profilePhoto",
+                            ""
+                    )
+            );
+
+            d.put(
+                    "createdAt",
+                    FieldValue.serverTimestamp()
+            );
+
+            d.put("replyTo", null);
+
+            db.collection("Chats")
+                    .document(room)
+                    .collection("Messages")
+                    .add(d)
+                    .addOnSuccessListener(
+                            x -> in.setText("")
+                    )
+                    .addOnFailureListener(
+                            e -> Toast.makeText(
+                                    this,
+                                    "Send failed: " +
+                                            e.getMessage(),
+                                    Toast.LENGTH_SHORT
+                            ).show()
+                    );
+        });
+
+        MaterialButton back =
+                btn("← Back");
+
+        content.addView(back);
+
+        back.setOnClickListener(
+                v -> showHome()
+        );
+
+        if (chatListener != null) {
+            chatListener.remove();
+        }
+
+        chatListener =
+                db.collection("Chats")
+                        .document(room)
+                        .collection("Messages")
+                        .orderBy(
+                                "createdAt",
+                                Query.Direction.ASCENDING
+                        )
+                        .addSnapshotListener(
+                                (snap, e) -> {
+
+                                    if (e != null ||
+                                            snap == null) {
+                                        return;
+                                    }
+
+                                    msgs.removeAllViews();
+
+                                    for (
+                                            DocumentSnapshot d :
+                                            snap.getDocuments()
+                                    ) {
+
+                                        Map<String, Object> x =
+                                                d.getData();
+
+                                        if (x == null) {
+                                            continue;
+                                        }
+
+                                        String name =
+                                                String.valueOf(
+                                                        x.getOrDefault(
+                                                                "senderName",
+                                                                "Student"
+                                                        )
+                                                );
+
+                                        String text =
+                                                String.valueOf(
+                                                        x.getOrDefault(
+                                                                "text",
+                                                                ""
+                                                        )
+                                                );
+
+                                        TextView m =
+                                                tv(
+                                                        "@" +
+                                                                name +
+                                                                "\n" +
+                                                                text,
+                                                        14
+                                                );
+
+                                        m.setBackgroundColor(
+                                                card
+                                        );
+
+                                        m.setPadding(
+                                                14,
+                                                10,
+                                                14,
+                                                10
+                                        );
+
+                                        LinearLayout.LayoutParams lp =
+                                                new LinearLayout.LayoutParams(
+                                                        -1,
+                                                        -2
+                                                );
+
+                                        lp.setMargins(
+                                                0,
+                                                4,
+                                                0,
+                                                4
+                                        );
+
+                                        msgs.addView(
+                                                m,
+                                                lp
+                                        );
+                                    }
+
+                                    sv.post(
+                                            () ->
+                                                    sv.fullScroll(
+                                                            View.FOCUS_DOWN
+                                                    )
+                                    );
+                                }
+                        );
+    }
+
+    void showNotifications() {
+
+        base("🔔 Notifications");
+
+        LinearLayout list =
+                new LinearLayout(this);
+
+        list.setOrientation(
+                LinearLayout.VERTICAL
+        );
+
+        content.addView(
+                list,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        -2
+                )
+        );
+
+        if (notifListener != null) {
+            notifListener.remove();
+        }
+
+        notifListener =
+                db.collection("Notifications")
+                        .whereIn(
+                                "toUid",
+                                Arrays.asList(
+                                        "all",
+                                        fbUser.getUid()
+                                )
+                        )
+                        .addSnapshotListener(
+                                (snap, e) -> {
+
+                                    if (e != null ||
+                                            snap == null) {
+                                        return;
+                                    }
+
+                                    list.removeAllViews();
+
+                                    List<DocumentSnapshot> items =
+                                            new ArrayList<>(
+                                                    snap.getDocuments()
+                                            );
+
+                                    Collections.sort(
+                                            items,
+                                            (
+                                                    a,
+                                                    b
+                                            ) ->
+                                                    Long.compare(
+                                                            time(b),
+                                                            time(a)
+                                                    )
+                                    );
+
+                                    for (
+                                            DocumentSnapshot d :
+                                            items
+                                    ) {
+
+                                        Map<String, Object> x =
+                                                d.getData();
+
+                                        if (x == null) {
+                                            continue;
+                                        }
+
+                                        TextView n =
+                                                tv(
+                                                        String.valueOf(
+                                                                x.getOrDefault(
+                                                                        "title",
+                                                                        "Announcement"
+                                                                )
+                                                        ) +
+                                                                "\n" +
+                                                                String.valueOf(
+                                                                        x.getOrDefault(
+                                                                                "body",
+                                                                                x.getOrDefault(
+                                                                                        "text",
+                                                                                        ""
+                                                                                )
+                                                                        )
+                                                                ),
+                                                        15
+                                                );
+
+                                        n.setBackgroundColor(
+                                                card
+                                        );
+
+                                        LinearLayout.LayoutParams lp =
+                                                new LinearLayout.LayoutParams(
+                                                        -1,
+                                                        -2
+                                                );
+
+                                        lp.setMargins(
+                                                0,
+                                                6,
+                                                0,
+                                                6
+                                        );
+
+                                        list.addView(
+                                                n,
+                                                lp
+                                        );
+                                    }
+                                }
+                        );
+
+        MaterialButton back =
+                btn("← Back");
+
+        content.addView(back);
+
+        back.setOnClickListener(v -> {
+
+            if (notifListener != null) {
+                notifListener.remove();
+                notifListener = null;
+            }
+
+            showHome();
+        });
+    }
+
+    long time(DocumentSnapshot d) {
+
+        Object t =
+                d.get("createdAt");
+
+        if (t instanceof Timestamp) {
+            return ((Timestamp) t)
+                    .toDate()
+                    .getTime();
+        }
+
+        return 0;
+    }
+
+    void showRules() {
+
+        base("📜 Community Rules");
+
+        TextView r =
+                tv("Loading...", 16);
+
+        content.addView(r);
+
+        if (rulesListener != null) {
+            rulesListener.remove();
+        }
+
+        rulesListener =
+                db.collection("Settings")
+                        .document("CommunityRules")
+                        .addSnapshotListener(
+                                (s, e) -> {
+
+                                    if (s != null &&
+                                            s.exists()) {
+
+                                        Object rules =
+                                                s.get("rules");
+
+                                        r.setText(
+                                                rules == null
+                                                        ? ""
+                                                        : String.valueOf(
+                                                                rules
+                                                        )
+                                        );
+                                    }
+                                }
+                        );
+
+        MaterialButton b =
+                btn("← Back");
+
+        content.addView(b);
+
+        b.setOnClickListener(v -> {
+
+            if (rulesListener != null) {
+                rulesListener.remove();
+                rulesListener = null;
+            }
+
+            showHome();
+        });
+    }
+
+    void showProfile() {
+
+        base("👤 Profile");
+
+        content.addView(
+                tv(
+                        "Username: @" +
+                                me.getOrDefault(
+                                        "username",
+                                        ""
+                                ),
+                        17
+                )
+        );
+
+        content.addView(
+                tv(
+                        "Name: " +
+                                me.getOrDefault(
+                                        "fullName",
+                                        ""
+                                ),
+                        17
+                )
+        );
+
+        content.addView(
+                tv(
+                        "Class: " +
+                                me.getOrDefault(
+                                        "classLevel",
+                                        ""
+                                ),
+                        17
+                )
+        );
+
+        content.addView(
+                tv(
+                        "School: " +
+                                me.getOrDefault(
+                                        "schoolName",
+                                        ""
+                                ),
+                        17
+                )
+        );
+
+        content.addView(
+                tv(
+                        "Role: " +
+                                me.getOrDefault(
+                                        "role",
+                                        "Student"
+                                ),
+                        17
+                )
+        );
+
+        EditText bio =
+                input("Bio");
+
+        bio.setText(
+                String.valueOf(
+                        me.getOrDefault(
+                                "bio",
+                                ""
+                        )
+                )
+        );
+
+        content.addView(bio);
+
+        MaterialButton save =
+                btn("Save Bio");
+
+        content.addView(save);
+
+        save.setOnClickListener(
+                v ->
+                        db.collection("Users")
+                                .document(
+                                        fbUser.getUid()
+                                )
+                                .update(
+                                        "bio",
+                                        bio.getText().toString()
+                                )
+        );
+
+        MaterialButton b =
+                btn("← Back");
+
+        content.addView(b);
+
+        b.setOnClickListener(
+                v -> showHome()
+        );
+    }
+
+    void simpleForm(
+            String titleText,
+            String collection
+    ) {
+
+        base(titleText);
+
+        EditText in =
+                input("Write here...");
+
+        in.setMinLines(5);
+
+        content.addView(in);
+
+        MaterialButton send =
+                btn("Submit");
+
+        content.addView(send);
+
+        send.setOnClickListener(v -> {
+
+            String t =
+                    in.getText()
+                            .toString()
+                            .trim();
+
+            if (t.isEmpty()) {
+                return;
+            }
+
+            Map<String, Object> d =
+                    new HashMap<>();
+
+            d.put(
+                    "uid",
+                    fbUser.getUid()
+            );
+
+            d.put(
+                    "username",
+                    me.getOrDefault(
+                            "username",
+                            "Student"
+                    )
+            );
+
+            d.put("text", t);
+
+            d.put(
+                    "createdAt",
+                    FieldValue.serverTimestamp()
+            );
+
+            db.collection(collection)
+                    .add(d)
+                    .addOnSuccessListener(
+                            x -> {
+
+                                Toast.makeText(
+                                        this,
+                                        "Submitted",
+                                        Toast.LENGTH_SHORT
+                                ).show();
+
+                                showHome();
+                            }
+                    );
+        });
+
+        MaterialButton b =
+                btn("← Back");
+
+        content.addView(b);
+
+        b.setOnClickListener(
+                v -> showHome()
+        );
+    }
+
+    void showAdmin() {
+
+        base("⚙️ Admin Panel");
+
+        content.setPadding(
+                16,
+                8,
+                16,
+                16
+        );
+
+        content.addView(
+                tv(
+                        "Live admin controls",
+                        18
+                )
+        );
+
+        EditText nt =
+                input("Notification title");
+
+        EditText nb =
+                input("Notification message");
+
+        content.addView(nt);
+        content.addView(nb);
+
+        MaterialButton send =
+                btn("📢 Send Global Notification");
+
+        content.addView(send);
+
+        send.setOnClickListener(v -> {
+
+            Map<String, Object> d =
+                    new HashMap<>();
+
+            d.put(
+                    "toUid",
+                    "all"
+            );
+
+            d.put(
+                    "title",
+                    nt.getText()
+                            .toString()
+                            .trim()
+                            .isEmpty()
+                            ? "Announcement"
+                            : nt.getText()
+                            .toString()
+                            .trim()
+            );
+
+            d.put(
+                    "body",
+                    nb.getText()
+                            .toString()
+                            .trim()
+            );
+
+            d.put(
+                    "createdAt",
+                    FieldValue.serverTimestamp()
+            );
+
+            d.put(
+                    "sentBy",
+                    me.getOrDefault(
+                            "username",
+                            "Admin"
+                    )
+            );
+
+            db.collection("Notifications")
+                    .add(d)
+                    .addOnSuccessListener(
+                            x -> {
+
+                                nt.setText("");
+                                nb.setText("");
+
+                                Toast.makeText(
+                                        this,
+                                        "Notification sent",
+                                        Toast.LENGTH_SHORT
+                                ).show();
+                            }
+                    );
+        });
+
+        EditText rules =
+                input("Community rules text");
+
+        content.addView(rules);
+
+        MaterialButton saveRules =
+                btn("Save Community Rules");
+
+        content.addView(saveRules);
+
+        saveRules.setOnClickListener(v -> {
+
+            if (!isOwner()) {
+
+                Toast.makeText(
+                        this,
+                        "Owner only",
+                        Toast.LENGTH_SHORT
+                ).show();
+
+                return;
+            }
+
+            db.collection("Settings")
+                    .document("CommunityRules")
+                    .set(
+                            Collections.singletonMap(
+                                    "rules",
+                                    rules.getText().toString()
+                            ),
+                            SetOptions.merge()
+                    );
+        });
+
+        EditText words =
+                input(
+                        "Bad words, comma separated"
+                );
+
+        content.addView(words);
+
+        MaterialButton saveWords =
+                btn("Save Anti-Abuse Words");
+
+        content.addView(saveWords);
+
+        saveWords.setOnClickListener(v -> {
+
+            if (!isOwner()) {
+
+                Toast.makeText(
+                        this,
+                        "Owner only",
+                        Toast.LENGTH_SHORT
+                ).show();
+
+                return;
+            }
+
+            List<String> w =
+                    new ArrayList<>();
+
+            for (
+                    String s :
+                    words.getText()
+                            .toString()
+                            .split(",")
+            ) {
+
+                if (!s.trim().isEmpty()) {
+                    w.add(s.trim());
+                }
+            }
+
+            db.collection("Settings")
+                    .document("AntiAbuse")
+                    .set(
+                            Collections.singletonMap(
+                                    "words",
+                                    w
+                            ),
+                            SetOptions.merge()
+                    );
+        });
+
+        EditText uname =
+                input(
+                        "Username to edit role"
+                );
+
+        content.addView(uname);
+
+        Spinner role =
+                new Spinner(this);
+
+        role.setAdapter(
+                new ArrayAdapter<>(
+                        this,
+                        android.R.layout.simple_spinner_dropdown_item,
+                        new String[]{
+                                "Student",
+                                "Admin",
+                                "Owner"
+                        }
+                )
+        );
+
+        content.addView(role);
+
+        MaterialButton roleBtn =
+                btn("Change Role");
+
+        content.addView(roleBtn);
+
+        roleBtn.setOnClickListener(v -> {
+
+            if (!isOwner()) {
+
+                Toast.makeText(
+                        this,
+                        "Owner only",
+                        Toast.LENGTH_SHORT
+                ).show();
+
+                return;
+            }
+
+            db.collection("Users")
+                    .whereEqualTo(
+                            "username",
+                            uname.getText()
+                                    .toString()
+                                    .trim()
+                                    .toLowerCase()
+                    )
+                    .limit(1)
+                    .get()
+                    .addOnSuccessListener(s -> {
+
+                        if (s.isEmpty()) {
+
+                            Toast.makeText(
+                                    this,
+                                    "User not found",
+                                    Toast.LENGTH_SHORT
+                            ).show();
+
+                            return;
+                        }
+
+                        s.getDocuments()
+                                .get(0)
+                                .getReference()
+                                .update(
+                                        "role",
+                                        role.getSelectedItem()
+                                                .toString()
+                                );
+                    });
+        });
+
+        MaterialButton back =
+                btn("← Back");
+
+        content.addView(back);
+
+        back.setOnClickListener(
+                v -> showHome()
+        );
+    }
+
+    boolean isOwner() {
+
+        return "Owner".equals(
+                String.valueOf(
+                        me.getOrDefault(
+                                "role",
+                                "Student"
+                        )
+                )
+        );
+    }
+
+    @Override
+    protected void onDestroy() {
+
+        if (userListener != null) {
+            userListener.remove();
+        }
+
+        if (chatListener != null) {
+            chatListener.remove();
+        }
+
+        if (notifListener != null) {
+            notifListener.remove();
+        }
+
+        if (rulesListener != null) {
+            rulesListener.remove();
+        }
+
+        super.onDestroy();
+    }
+            }
