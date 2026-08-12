@@ -5,141 +5,38 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.os.Build;
-
 import androidx.core.app.NotificationCompat;
-
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
+import java.util.HashMap;
+import java.util.Map;
 
 public class StudentHubMessagingService extends FirebaseMessagingService {
-    private static final String CHANNEL_DEFAULT = "studenthub_default";
-    private static final String CHANNEL_FORCE = "studenthub_force";
-
-    /**
-     * Step 8 (NATIVE_BUILD_PROMPT.md): whenever FCM (re)issues a token — first install,
-     * app data cleared, token rotated — persist it on Users/{uid}.fcmToken so admin
-     * "Send Notification" can eventually target devices directly. If no one is signed
-     * in yet, MainActivity's post-login fetch (FirebaseMessaging.getInstance().token)
-     * covers that case instead.
-     */
-    @Override
-    public void onNewToken(String token) {
+    private static final String CHANNEL_ID = "studenthub_messages";
+    @Override public void onNewToken(String token) {
         super.onNewToken(token);
-        String uid = FirebaseAuth.getInstance().getUid();
-        if (uid == null) return;
-        FirebaseFirestore.getInstance()
-                .collection("Users")
-                .document(uid)
-                .update("fcmToken", token);
+        if (FirebaseAuth.getInstance().getCurrentUser() == null) return;
+        String uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        Map<String,Object> data = new HashMap<>(); data.put("enabled", true); data.put("updatedAt", System.currentTimeMillis());
+        FirebaseFirestore.getInstance().collection("Users").document(uid).collection("FcmTokens").document(token).set(data, SetOptions.merge());
     }
-
-    @Override
-    public void onMessageReceived(RemoteMessage message) {
-        if (message == null) return;
-
-        String type = get(message, "type", "message");
-        boolean force = "force".equalsIgnoreCase(type) ||
-                        "important".equalsIgnoreCase(type);
-
-        // Force/important notifications are intentionally independent
-        // from ordinary message notification toggles.
-        if (!force) {
-            if (!NotificationSettings.appEnabled(this)) return;
-            if ("announcement".equalsIgnoreCase(type) &&
-                    !NotificationSettings.announcements(this)) return;
-            if ("global".equalsIgnoreCase(type) &&
-                    !NotificationSettings.global(this)) return;
-
-            if (isMessageType(type)) {
-                String mode = NotificationSettings.messageMode(this);
-                if ("off".equalsIgnoreCase(mode)) return;
-                if ("mentions".equalsIgnoreCase(mode) && !isMention(message)) return;
-            }
-
-            String classId = message.getData().get("classId");
-            if (classId != null && !NotificationSettings.classEnabled(this, classId)) return;
-        }
-
-        String title = message.getNotification() != null &&
-                message.getNotification().getTitle() != null
-                ? message.getNotification().getTitle()
-                : get(message, "title", "Student Hub");
-
-        String body = message.getNotification() != null &&
-                message.getNotification().getBody() != null
-                ? message.getNotification().getBody()
-                : get(message, "body", "New notification");
-
-        show(title, body, force);
+    @Override public void onMessageReceived(RemoteMessage message) {
+        super.onMessageReceived(message);
+        String title = "StudentHub"; String body = "New notification";
+        if (message.getNotification() != null) { if (message.getNotification().getTitle()!=null) title=message.getNotification().getTitle(); if (message.getNotification().getBody()!=null) body=message.getNotification().getBody(); }
+        if (message.getData().get("title") != null) title=message.getData().get("title");
+        if (message.getData().get("body") != null) body=message.getData().get("body");
+        show(title, body);
     }
-
-    private boolean isMessageType(String type) {
-        return "message".equalsIgnoreCase(type) ||
-               "mention".equalsIgnoreCase(type) ||
-               "reply".equalsIgnoreCase(type) ||
-               "tag".equalsIgnoreCase(type);
-    }
-
-    private boolean isMention(RemoteMessage m) {
-        String value = m.getData().get("mentioned");
-        return "true".equalsIgnoreCase(value) ||
-               "1".equals(value) ||
-               "mention".equalsIgnoreCase(m.getData().get("type")) ||
-               "reply".equalsIgnoreCase(m.getData().get("type")) ||
-               "tag".equalsIgnoreCase(m.getData().get("type"));
-    }
-
-    private String get(RemoteMessage m, String key, String fallback) {
-        String v = m.getData().get(key);
-        return v == null || v.isEmpty() ? fallback : v;
-    }
-
-    private void show(String title, String body, boolean force) {
-        NotificationManager nm =
-                (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-
-        String channelId = force ? CHANNEL_FORCE : CHANNEL_DEFAULT;
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            int importance = force
-                    ? NotificationManager.IMPORTANCE_HIGH
-                    : NotificationManager.IMPORTANCE_DEFAULT;
-
-            NotificationChannel ch = new NotificationChannel(
-                    channelId,
-                    force ? "Student Hub Important" : "Student Hub",
-                    importance
-            );
-            ch.setDescription(force
-                    ? "Important Student Hub app notifications"
-                    : "Student Hub app notifications");
-            nm.createNotificationChannel(ch);
-        }
-
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP |
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP);
-
-        PendingIntent pi = PendingIntent.getActivity(
-                this, 1001, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT |
-                (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0)
-        );
-
-        NotificationCompat.Builder builder =
-                new NotificationCompat.Builder(this, channelId)
-                        .setSmallIcon(getApplicationInfo().icon)
-                        .setContentTitle(title)
-                        .setContentText(body)
-                        .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
-                        .setContentIntent(pi)
-                        .setAutoCancel(true)
-                        .setPriority(force
-                                ? NotificationCompat.PRIORITY_HIGH
-                                : NotificationCompat.PRIORITY_DEFAULT);
-
-        nm.notify((int) (System.currentTimeMillis() & 0x7fffffff), builder.build());
+    private void show(String title,String body){
+        NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
+        if(Build.VERSION.SDK_INT>=26) nm.createNotificationChannel(new NotificationChannel(CHANNEL_ID,"StudentHub notifications",NotificationManager.IMPORTANCE_HIGH));
+        Intent i=new Intent(this,MainActivity.class); i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent pi=PendingIntent.getActivity(this,0,i,PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
+        NotificationCompat.Builder b=new NotificationCompat.Builder(this,CHANNEL_ID).setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(title).setContentText(body).setStyle(new NotificationCompat.BigTextStyle().bigText(body)).setAutoCancel(true).setContentIntent(pi).setPriority(NotificationCompat.PRIORITY_HIGH);
+        nm.notify((int)(System.currentTimeMillis()%100000),b.build());
     }
 }

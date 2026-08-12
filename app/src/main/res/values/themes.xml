@@ -1,3 +1,6 @@
 <resources>
-    <style name="Theme.StudentHubNative" parent="android:Theme.Material.Light.NoActionBar" />
+<style name="Theme.StudentHub" parent="Theme.Material3.DayNight.NoActionBar">
+    <item name="android:fontFamily">sans</item><item name="android:colorAccent">@color/primary</item>
+    <item name="android:navigationBarColor">@color/bg</item><item name="android:statusBarColor">@color/bg</item>
+</style>
 </resources>
