@@ -1,0 +1,62 @@
+rules_version = '2';
+
+// -----------------------------------------------------------------------
+// StudentHub Storage Security Rules
+//
+// CAVEAT: Storage rules cannot read arbitrary Firestore state efficiently
+// nor verify "admin" status for notificationPhotos without a Firestore
+// lookup (which IS supported via firestore.get but adds latency/cost).
+// We implement an admin check via firestore.get on Users/{uid} for
+// notificationPhotos writes. Document this caveat: this performs a
+// cross-service read on every notificationPhotos write; ensure the
+// Users collection stays small enough / rules quota is acceptable.
+// -----------------------------------------------------------------------
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        firestore.get(/databases/(default)/documents/Users/$(request.auth.uid)).data.role in ['Admin', 'Owner'];
+    }
+
+    function notBanned() {
+      return isSignedIn() &&
+        firestore.get(/databases/(default)/documents/Users/$(request.auth.uid)).data.isBanned != true;
+    }
+
+    // Profile photos: owner-writable, signed-in-readable.
+    match /profilePhotos/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+        && fileName.matches(request.auth.uid + '\\..*')
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Chat photos: any signed-in, non-banned user may upload; signed-in users may read.
+    match /chatPhotos/{roomId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+        && notBanned()
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Notification photos: intended admin-only. See caveat above.
+    match /notificationPhotos/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin()
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
