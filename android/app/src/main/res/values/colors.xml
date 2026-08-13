@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="aurora_background">#08080D</color>
+    <color name="aurora_surface">#0D0D14</color>
+    <color name="aurora_onBackground">#EDEBF5</color>
+    <color name="aurora_primary">#9B8CFF</color>
+    <color name="aurora_onPrimary">#19103F</color>
+    <color name="aurora_primaryContainer">#2E2464</color>
+    <color name="aurora_secondary">#52E2D0</color>
+    <color name="aurora_onSecondary">#00201C</color>
+    <color name="aurora_surfaceVariant">#1A1A25</color>
+    <color name="aurora_onSurfaceVariant">#B9B6C7</color>
+    <color name="aurora_tertiary">#FF9CC4</color>
+    <color name="aurora_error">#FF6B7A</color>
+    <color name="aurora_outline">#3A3A4C</color>
+    <color name="aurora_inputBg">#23232F</color>
+</resources>
